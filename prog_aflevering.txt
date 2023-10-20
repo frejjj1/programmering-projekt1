@@ -1,0 +1,94 @@
+-- Animations
+
+require 'bit'
+
+local options = { "Static Legs", "Pitch 0 on land", "Moonwalk" }
+animation = ui.new_multiselect("AA", "Anti-aimbot angles", "\aFF5F5FFFZ".."\aFFFFFFFF Animations", options)
+
+local fakelag = ui.reference("AA", "Fake lag", "Limit")
+local ground_ticks, end_time = 1, 0
+local original_pitch = 0
+
+local ent = require "gamesense/entity"
+
+client.set_event_callback("pre_render", function()
+    if not entity.is_alive(entity.get_local_player()) then
+        return
+    end
+
+    if ui.get(animation) then
+        for i, v in ipairs(ui.get(animation)) do
+            if v == "Static Legs" then
+                entity.set_prop(entity.get_local_player(), "m_flPoseParameter", 1, 6)
+            elseif v == "Pitch 0 on land" then
+                local on_ground = bit.band(entity.get_prop(entity.get_local_player(), "m_fFlags"), 1)
+
+                if on_ground == 1 then
+                    ground_ticks = ground_ticks + 1
+                    original_pitch = entity.get_prop(entity.get_local_player(), "m_flPoseParameter", 12)
+                    entity.set_prop(entity.get_local_player(), "m_flPoseParameter", 0, 12)
+                else
+                    ground_ticks = 0
+                    end_time = globals.curtime() + 1
+                end
+
+                if ground_ticks > ui.get(fakelag) + 1 and end_time > globals.curtime() then
+                    entity.set_prop(entity.get_local_player(), "m_flPoseParameter", 0.5, 12)
+                else
+                    entity.set_prop(entity.get_local_player(), "m_flPoseParameter", original_pitch, 12)
+                end
+            elseif v == "Moonwalk" then
+                local me = ent.get_local_player()
+                local m_fFlags = me:get_prop("m_fFlags")
+                local is_onground = bit.band(m_fFlags, 1) ~= 0
+                if not is_onground then
+                    local my_animlayer = me:get_anim_overlay(6) -- MOVEMENT_MOVE
+                    my_animlayer.weight = 1
+                end
+            end
+        end
+    end
+end)
+
+-- Filter console
+
+setconsole = ui.new_checkbox("AA", "Anti-aimbot angles", "\aFF5F5FFFZ".."\aFFFFFFFF - Filter console")
+ui.set_callback(setconsole, function()
+    if ui.get(setconsole) then
+        cvar.developer:set_int(0)
+        cvar.con_filter_enable:set_int(1)
+        cvar.con_filter_text:set_string("IrWL5106TZZKNFPz4P4Gl3pSN?J370f5hi373ZjPg%VOVh6lN")
+    else
+        cvar.con_filter_enable:set_int(0)
+        cvar.con_filter_text:set_string("")
+    end
+end)
+client.set_event_callback("shutdown", function()
+    cvar.con_filter_enable:set_int(0)
+    cvar.con_filter_text:set_string("")
+end)
+
+
+-- disable Anti-aim on warm up
+
+enableRoundTime = ui.new_checkbox("AA", "Anti-aimbot angles", "\aFF5F5FFFZ".."\aFFFFFFFF - disable AA on warmup")
+
+local function getRoundTime()
+    local game_rules = entity.get_game_rules()
+    if not game_rules then
+        return
+    end
+    return entity.get_prop(game_rules, "m_bWarmupPeriod")
+end
+
+client.set_event_callback("setup_command", function(e)
+    if ui.get(enableRoundTime) then
+        local game_rules = entity.get_game_rules()
+        if game_rules and entity.get_prop(game_rules, "m_bWarmupPeriod") == 1 then
+            ui.set(GameSzensze[1], false)
+        else
+            ui.set(GameSzensze[1], true)
+        end
+    end
+end)
+
